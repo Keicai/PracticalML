@@ -1,3 +1,3 @@
 # Practical Machine Learning
  
-Html link -- https://keicai.github.io/Practical-Machine-Learning/Assignment.html
+Html link -- https://keicai.github.io/PracticalML/Assignment.html
