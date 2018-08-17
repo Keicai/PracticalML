@@ -1,0 +1,139 @@
+---
+title: "Prediction Assignment"
+author: "Sy"
+date: "17 August 2018"
+output: html_document
+---
+
+## Executive Summary
+
+With proliferation of wearable devices, large amount of data about personal activity are collected. This report aims to detect how well these users perform barbell lifts in 5 different ways.A prediction model using these data (accelerometers on the belt, forearm, arm, and dumbell of 6 participants) is created to identify correct and incorrect ways of performing barbell lifts.
+
+## Methodology
+
+Two models are created and compared to identify the best prediction model in terms of prediction accuracy. The method chosen are decision tree and random forest.
+
+## Load required library
+
+```{r setup, message=FALSE}
+suppressWarnings(library(caret))
+suppressWarnings(library(rattle))
+suppressWarnings(library(randomForest))
+suppressWarnings(library(corrplot))
+suppressWarnings(library(e1071))
+suppressWarnings(library(nnet))
+suppressWarnings(library(rpart))
+suppressWarnings(library(rpart.plot))
+```
+
+## Loading data - Human Activity Recognition
+These data are provided by Groupware@Les
+```{r data, message = FALSE, warning=FALSE}
+url1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+download.file(url1, destfile = "./train.csv")
+download.file(url2, destfile = "./test.csv")
+
+train <- read.csv("./train.csv")
+test <- read.csv("./test.csv")
+```
+
+## Preparation of Data for Modeling
+
+70% of the data will be randomly selected as training dataset and remaining 30% will be testing dataset.
+```{r partition}
+inTrain <- createDataPartition(train$classe, p = 0.7, list = FALSE)
+training <- train[inTrain,]
+testing <- train[-inTrain,]
+```
+
+Features with near zero variance, NA with more than 90% will be removed, and non-predictors (identification columns)
+
+```{r}
+## remove near zero variance features
+nzv <- nearZeroVar(training)
+training <- training[,-nzv]
+testing <- testing[, -nzv]
+
+## remove features with high missing values
+na <- sapply(training, function(x) mean(is.na(x))) >0.90
+training <- training[, na == FALSE]
+testing <- testing[, na == FALSE]
+
+## remove non-predictors from data
+training <- training[, -(1:5)]
+testing <- testing[, -(1:5)]
+
+dim(training); dim(testing)
+```
+
+## Exploratory Data Analysis
+
+Identify features which are highly correlated with one another and remove them from the analysis.
+```{r}
+matrix <- cor(training[, -54])
+corrplot(matrix, order = "FPC", method = "color", type = "lower", tl.cex = 0.8, tl.col = rgb(0, 0, 0))
+```
+
+Since most of the features are not correlated to one another and our features are already reduced to 53, there is no need for feature reduction techniques such as PCA.
+
+## Prediction Modeling
+
+### Decision Tree
+
+```{r dtfit, message=FALSE}
+set.seed(123)
+dtfit <- rpart(classe ~., data =training, method = "class")
+rpart.plot(dtfit)
+```
+
+```{r dtcon}
+# prediction on test data
+preddt <- predict(dtfit, newdata = testing, type = "class")
+confdt <- confusionMatrix(preddt, testing$classe)
+dtacc <- round(confdt$overall['Accuracy']*100,digits = 2)
+dtacc
+confdt
+#confdt$table
+#plot(confdt$table, main = "Confusion Matrix of Decision Tree")
+```
+
+The model is able to predict fairly well with `r dtacc`% accuracy.
+
+### Random Forest
+
+```{r rffit, message=FALSE}
+set.seed(123)
+n <- 100 #number of trees
+rffit <- randomForest(classe ~., data = training, importance=TRUE, ntree= n)
+varImpPlot(rffit, main = "Random Forest Features Importance Plot")
+```
+
+Top 3 features includes:
+1. row belt
+2. yaw belt
+3. num_window
+
+```{r rfcon}
+# prediction on test data
+predrf <- predict(rffit, newdata = testing, type = "class")
+confrf <- confusionMatrix(predrf, testing$classe)
+rfacc <- round(confrf$overall['Accuracy']*100,digits = 2)
+rfacc
+confrf
+#plot(confrf$table, main = "Confusion Matrix of Random Forest")
+```
+
+The model is able to predict with high accuracy of `r rfacc`%.
+
+## Model Comparison
+
+From above, random forest exhibits the highest prediction accuracy (`r rfacc`%) and will be used for the quiz tests.
+
+```{r}
+predtest <- predict(rffit, newdata = test)
+predtest
+```
+
+
